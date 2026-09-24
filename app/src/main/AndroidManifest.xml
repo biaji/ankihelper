@@ -28,6 +28,7 @@
         <activity
             android:name=".ui.popup.PopupActivity"
             android:excludeFromRecents="true"
+            android:exported="true"
             android:launchMode="singleInstance"
             android:noHistory="true"
             android:theme="@style/Transparent"
@@ -74,6 +75,7 @@
 
         <activity
             android:name=".ui.LauncherActivity"
+            android:exported="true"
             android:theme="@style/AppTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -92,7 +94,7 @@
         </activity>
 
         <provider
-            android:name="android.support.v4.content.FileProvider"
+            android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
             android:exported="false"
             android:grantUriPermissions="true">
@@ -103,6 +105,7 @@
 
         <activity
             android:name="com.nononsenseapps.filepicker.FilePickerActivity"
+            android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/FilePickerTheme">
             <intent-filter>

@@ -1,5 +1,9 @@
 package com.mmjang.ankihelper.ui.popup;
 
+import static com.mmjang.ankihelper.util.FieldUtil.getBlankSentence;
+import static com.mmjang.ankihelper.util.FieldUtil.getBoldSentence;
+import static com.mmjang.ankihelper.util.FieldUtil.getNormalSentence;
+
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -12,28 +16,16 @@ import android.graphics.drawable.BitmapDrawable;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
-import android.net.wifi.hotspot2.omadm.PpsMoParser;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Vibrator;
-import android.support.annotation.RequiresApi;
-import android.support.design.chip.Chip;
-import android.support.design.chip.ChipGroup;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.widget.NestedScrollView;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.CardView;
-import android.support.v7.widget.RecyclerView;
 import android.text.Html;
 import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Log;
 import android.view.ActionMode;
-import android.view.DragEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -51,7 +43,6 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ListAdapter;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.SimpleCursorAdapter;
@@ -59,8 +50,12 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.cardview.widget.CardView;
+import androidx.core.content.ContextCompat;
+
 import com.bumptech.glide.Glide;
-import com.ichi2.anki.FlashCardsContract;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 import com.ichi2.anki.api.NoteInfo;
 import com.mmjang.ankihelper.MyApplication;
 import com.mmjang.ankihelper.R;
@@ -69,7 +64,6 @@ import com.mmjang.ankihelper.data.Settings;
 import com.mmjang.ankihelper.data.database.ExternalDatabase;
 import com.mmjang.ankihelper.data.dict.BingImage;
 import com.mmjang.ankihelper.data.dict.Definition;
-import com.mmjang.ankihelper.data.dict.DictionaryDotCom;
 import com.mmjang.ankihelper.data.dict.DictionaryRegister;
 import com.mmjang.ankihelper.data.dict.Dub91Sentence;
 import com.mmjang.ankihelper.data.dict.EudicSentence;
@@ -80,13 +74,10 @@ import com.mmjang.ankihelper.data.dict.UrbanAutoCompleteAdapter;
 import com.mmjang.ankihelper.data.dict.VocabCom;
 import com.mmjang.ankihelper.data.history.HistoryUtil;
 import com.mmjang.ankihelper.data.model.UserTag;
-import com.mmjang.ankihelper.data.plan.OutputPlan;
 import com.mmjang.ankihelper.data.plan.OutputPlanPOJO;
 import com.mmjang.ankihelper.domain.CBWatcherService;
 import com.mmjang.ankihelper.domain.PlayAudioManager;
 import com.mmjang.ankihelper.domain.PronounceManager;
-import com.mmjang.ankihelper.ui.LauncherActivity;
-import com.mmjang.ankihelper.ui.plan.PlanEditorActivity;
 import com.mmjang.ankihelper.ui.widget.BigBangLayout;
 import com.mmjang.ankihelper.ui.widget.BigBangLayoutWrapper;
 import com.mmjang.ankihelper.util.Constant;
@@ -114,8 +105,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -123,15 +112,11 @@ import java.util.Set;
 
 import me.everything.android.ui.overscroll.OverScrollDecoratorHelper;
 
-import static com.mmjang.ankihelper.util.FieldUtil.getBlankSentence;
-import static com.mmjang.ankihelper.util.FieldUtil.getBoldSentence;
-import static com.mmjang.ankihelper.util.FieldUtil.getNormalSentence;
-
 
 public class PopupActivity extends Activity implements BigBangLayoutWrapper.ActionListener{
 
     List<IDictionary> dictionaryList;
-    IDictionary currentDicitonary;
+    IDictionary currentDictionary;
     List<OutputPlanPOJO> outputPlanList;
     List<String> languageList;
     OutputPlanPOJO currentOutputPlan;
@@ -363,14 +348,14 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
             if (outputPlanList.size() > 0) {
                 settings.setLastSelectedPlan(outputPlanList.get(0).getPlanName());
                 currentOutputPlan = outputPlanList.get(0);
-                currentDicitonary = getDictionaryFromOutputPlan(currentOutputPlan);
-                if(currentDicitonary == null){
+                currentDictionary = getDictionaryFromOutputPlan(currentOutputPlan);
+                if(currentDictionary == null){
                     String message = String.format("方案\"%s\"所选词典\"%s\"不存在，请检查是否需要重新导入自定义词典",
                             currentOutputPlan.getPlanName(),
                             currentOutputPlan.getDictionaryKey());
                     Utils.showMessage(PopupActivity.this, message);
                 }else {
-                    setActAdapter(currentDicitonary);
+                    setActAdapter(currentDictionary);
                 }
             } else {
                 return ;
@@ -390,15 +375,15 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
                 isDuringPlanSpinnerInit = true;
                 planSpinner.setSelection(i);
                 currentOutputPlan = outputPlanList.get(i);
-                currentDicitonary = getDictionaryFromOutputPlan(currentOutputPlan);
-                if(currentDicitonary == null) {
+                currentDictionary = getDictionaryFromOutputPlan(currentOutputPlan);
+                if(currentDictionary == null) {
                     String message = String.format("方案\"%s\"所选词典\"%s\"不存在，请检查是否需要重新导入自定义词典",
                             currentOutputPlan.getPlanName(),
                             currentOutputPlan.getDictionaryKey());
                     Utils.showMessage(PopupActivity.this, message);
                     break;
                 }
-                setActAdapter(currentDicitonary);
+                setActAdapter(currentDictionary);
                 find = true;
                 break;
             }
@@ -410,14 +395,14 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
             if (outputPlanList.size() > 0) {
                 settings.setLastSelectedPlan(outputPlanList.get(0).getPlanName());
                 currentOutputPlan = outputPlanList.get(0);
-                currentDicitonary = getDictionaryFromOutputPlan(currentOutputPlan);
-                if(currentDicitonary == null) {
+                currentDictionary = getDictionaryFromOutputPlan(currentOutputPlan);
+                if(currentDictionary == null) {
                     String message = String.format("方案\"%s\"所选词典\"%s\"不存在，请检查是否需要重新导入自定义词典",
                             currentOutputPlan.getPlanName(),
                             currentOutputPlan.getDictionaryKey());
                     Utils.showMessage(PopupActivity.this, message);
                 }
-                setActAdapter(currentDicitonary);
+                setActAdapter(currentDictionary);
             }
         } else {
             //if find, then current plan and dictionary must have been set above.
@@ -492,8 +477,8 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
                     @Override
                     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                         currentOutputPlan = outputPlanList.get(position);
-                        currentDicitonary = getDictionaryFromOutputPlan(currentOutputPlan);
-                        setActAdapter(currentDicitonary);
+                        currentDictionary = getDictionaryFromOutputPlan(currentOutputPlan);
+                        setActAdapter(currentDictionary);
                         //memorise last selected plan
                         settings.setLastSelectedPlan(currentOutputPlan.getPlanName());
                         String actContent = act.getText().toString();
@@ -809,7 +794,7 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
             showPronounce(false);
             return;
         }
-        if(currentDicitonary == null || currentOutputPlan == null){
+        if(currentDictionary == null || currentOutputPlan == null){
             return;
         }
         showProgressBar();
@@ -821,7 +806,7 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
                 try {
                     //Your code goes here
                     Log.d("clicked", "yes");
-                    List<Definition> d = currentDicitonary.wordLookup(word);
+                    List<Definition> d = currentDictionary.wordLookup(word);
                     Message message = mHandler.obtainMessage();
                     message.obj = d;
                     message.what = PROCESS_DEFINITION_LIST;
@@ -952,9 +937,9 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
             defImage.setVisibility(View.VISIBLE);
         }
 
-        if((currentDicitonary instanceof EudicSentence ||
-                currentDicitonary instanceof SolrDictionary ||
-                currentDicitonary instanceof RenRenCiDianSentence) && def.getAudioUrl()!=null && !def.getAudioUrl().isEmpty()){
+        if((currentDictionary instanceof EudicSentence ||
+                currentDictionary instanceof SolrDictionary ||
+                currentDictionary instanceof RenRenCiDianSentence) && def.getAudioUrl()!=null && !def.getAudioUrl().isEmpty()){
             textVeiwDefinition.setTextIsSelectable(false);
             textVeiwDefinition.setOnClickListener(
                     new View.OnClickListener() {
@@ -1086,9 +1071,9 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
                             //save image
                             if (def.getImageUrl() != null && !def.getImageUrl().isEmpty()) {
                                 if (defImage.getDrawable() != null &&
-                                        (currentDicitonary instanceof BingImage ||
-                                                currentDicitonary instanceof RenRenCiDianSentence ||
-                                                currentDicitonary instanceof Dub91Sentence)) {
+                                        (currentDictionary instanceof BingImage ||
+                                                currentDictionary instanceof RenRenCiDianSentence ||
+                                                currentDictionary instanceof Dub91Sentence)) {
                                     BitmapDrawable drawable = (BitmapDrawable) defImage.getDrawable();
                                     Bitmap bm = drawable.getBitmap();
 
@@ -1188,8 +1173,8 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
                                 i++;
                             }
                             //handle download; audio or image
-                            if (currentDicitonary instanceof EudicSentence ||
-                                    currentDicitonary instanceof RenRenCiDianSentence) {
+                            if (currentDictionary instanceof EudicSentence ||
+                                    currentDictionary instanceof RenRenCiDianSentence) {
                                 if (fetch == null) {
                                     initFetch();
                                 }
@@ -1217,7 +1202,7 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
                                 }
                             }
 
-                            if (currentDicitonary instanceof SolrDictionary) {
+                            if (currentDictionary instanceof SolrDictionary) {
                                 if (fetch == null) {
                                     initFetch();
                                 }
@@ -1245,7 +1230,7 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
                                 }
                             }
 
-                            if (currentDicitonary instanceof VocabCom) {
+                            if (currentDictionary instanceof VocabCom) {
                                 if (fetch == null) {
                                     initFetch();
                                 }
@@ -1305,7 +1290,7 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
                                     }
                                     //save note add
                                     HistoryUtil.saveNoteAdd("", getBoldSentence(bigBangLayout.getLines()),
-                                            currentDicitonary.getDictionaryName(),
+                                            currentDictionary.getDictionaryName(),
                                             textVeiwDefinition.getText().toString(),
                                             mTranslatedResult,
                                             mNoteEditedByUser,
