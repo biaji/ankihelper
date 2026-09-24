@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ClipboardManager.OnPrimaryClipChangedListener;
 import android.content.Intent;
@@ -21,11 +22,7 @@ import com.mmjang.ankihelper.ui.popup.PopupActivity;
 import com.mmjang.ankihelper.util.Constant;
 
 public class CBWatcherService extends Service {
-    private OnPrimaryClipChangedListener listener = new OnPrimaryClipChangedListener() {
-        public void onPrimaryClipChanged() {
-            performClipboardCheck();
-        }
-    };
+    private final OnPrimaryClipChangedListener listener = this::performClipboardCheck;
     private ClipboardManager pm;
 
     @Override
@@ -56,8 +53,9 @@ public class CBWatcherService extends Service {
             notificationChannel.setShowBadge(true);
             notificationChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-            manager.createNotificationChannel(notificationChannel);
-        }else{
+            if (manager != null) {
+                manager.createNotificationChannel(notificationChannel);
+            }
         }
         long[] vibList = new long[1];
         vibList[0] = 10L;
@@ -72,8 +70,7 @@ public class CBWatcherService extends Service {
             pendingIntentFlags |= PendingIntent.FLAG_IMMUTABLE;
         }
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intentStart, pendingIntentFlags);
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this)
-                .setChannelId(CHANNEL_ONE_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ONE_ID)
                 .setSmallIcon(R.drawable.icon_light)
                 .setContentTitle(getResources().getText(R.string.app_name))
                 .setContentIntent(pendingIntent)
@@ -99,20 +96,29 @@ public class CBWatcherService extends Service {
         if (!Settings.getInstance(MyApplication.getContext()).getMoniteClipboardQ()) {
             return;
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Android 10+ (API 29+) 系统限制后台服务直接读取剪切板与后台启动 Activity
+            // 用户需通过点击前台服务通知弹出划词界面
+            return;
+        }
         ClipboardManager cb = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        if (cb.hasPrimaryClip()) {
-            if (cb.hasText()) {
-                String text = cb.getText().toString();
-                if (/*isEnglish(text)*/true) {
-                    long[] vibList = new long[1];
-                    vibList[0] = 10L;
+        if (cb != null && cb.hasPrimaryClip()) {
+            ClipData clipData = cb.getPrimaryClip();
+            if (clipData != null && clipData.getItemCount() > 0) {
+                CharSequence textSeq = clipData.getItemAt(0).coerceToText(this);
+                if (textSeq != null) {
+                    String text = textSeq.toString();
                     Intent intent = new Intent(getApplicationContext(), PopupActivity.class);
                     intent.setAction(Intent.ACTION_SEND);
                     intent.setType("text/plain");
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
                     intent.putExtra(Intent.EXTRA_TEXT, text);
-                    startActivity(intent);
+                    try {
+                        startActivity(intent);
+                    } catch (Exception e) {
+                        Log.e("CBWatcherService", "Cannot start activity from background", e);
+                    }
                 }
             }
         }

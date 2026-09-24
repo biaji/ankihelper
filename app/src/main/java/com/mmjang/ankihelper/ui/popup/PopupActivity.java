@@ -7,6 +7,7 @@ import static com.mmjang.ankihelper.util.FieldUtil.getNormalSentence;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -224,7 +225,6 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
         super.onCreate(savedInstanceState);
         setStatusBarColor();
         setContentView(R.layout.activity_popup);
-//        getActionBar().hide();
         //set animation
         overridePendingTransition(R.anim.slide_in, R.anim.slide_out);
         scrollView = (ScrollView) findViewById(R.id.scrollView);
@@ -248,13 +248,10 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
 
     private void asyncInvokeDroid() {
         new Thread(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        try{
-                            MyApplication.getAnkiDroid().getApi().getDeckList();
-                        }catch (Exception e){
-                        }
+                () -> {
+                    try{
+                        MyApplication.getAnkiDroid().getApi().getDeckList();
+                    }catch (Exception e){
                     }
                 }
         ).start();
@@ -407,22 +404,6 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
         } else {
             //if find, then current plan and dictionary must have been set above.
         }
-
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-//            scrollView.setOnScrollChangeListener(
-//                    new View.OnScrollChangeListener() {
-//                        @Override
-//                        public void onScrollChange(View view, int i, int i1, int i2, int i3) {
-//                            if(i1 > i3){
-//                                mFab.hide();
-//                            }else{
-//                                mFab.show();
-//                                //mFab.setAlpha(Constant.FLOAT_ACTION_BUTTON_ALPHA);
-//                            }
-//                        }
-//                    }
-//            );
-//        }
     }
 
     private void populateLanguageSpinner() {
@@ -512,58 +493,39 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
         });
 
         btnSearch.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        final String word = act.getText().toString();
-                        if (!word.isEmpty()) {
-                            asyncSearch(word);
-                            Utils.hideSoftKeyboard(PopupActivity.this);
-                        }
+                v -> {
+                    final String word = act.getText().toString();
+                    if (!word.isEmpty()) {
+                        asyncSearch(word);
+                        Utils.hideSoftKeyboard(PopupActivity.this);
                     }
                 }
         );
 
-        btnPronounce.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                final String word = act.getText().toString();
-                PlayAudioManager.playPronounceVoice(PopupActivity.this, word);
-            }
+        btnPronounce.setOnClickListener(view -> {
+            final String word = act.getText().toString();
+            PlayAudioManager.playPronounceVoice(PopupActivity.this, word);
         });
 
         mBtnEditNote.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        setupEditNoteDialog();
-                    }
-                }
+                v -> setupEditNoteDialog()
         );
 
         mBtnEditTag.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        setupEditTagDialog();
-                    }
-                }
+                v -> setupEditTagDialog()
         );
 
         act.setOnItemClickListener(
-                new AdapterView.OnItemClickListener() {
-                    @Override
-                    public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                        Log.d("autocomplete", i + "");
-                        act.post(
-                                new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        btnSearch.callOnClick();
-                                    }
+                (adapterView, view, i, l) -> {
+                    Log.d("autocomplete", i + "");
+                    act.post(
+                            new Runnable() {
+                                @Override
+                                public void run() {
+                                    btnSearch.callOnClick();
                                 }
-                        );
-                    }
+                            }
+                    );
                 }
         );
 
@@ -647,25 +609,14 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
         if (definitionList.isEmpty()) {
             Toast.makeText(this, R.string.definition_not_found, Toast.LENGTH_SHORT).show();
         } else {
-//            DefinitionAdapter defAdapter = new DefinitionAdapter(PopupActivity.this, definitionList, mTextSplitter, currentOutputPlan);
-//            LinearLayoutManager llm = new LinearLayoutManager(this);
-//            //llm.setAutoMeasureEnabled(true);
-//            recyclerViewDefinitionList.setLayoutManager(llm);
-//            //recyclerViewDefinitionList.getRecycledViewPool().setMaxRecycledViews(0,0);
-//            //recyclerViewDefinitionList.setHasFixedSize(true);
-//            //recyclerViewDefinitionList.setNestedScrollingEnabled(false);
-//            recyclerViewDefinitionList.setAdapter(defAdapter);
             viewDefinitionList.removeAllViewsInLayout();
             for (Definition def : definitionList) {
                 viewDefinitionList.addView(getCardFromDefinition(def));
             }
             viewDefinitionList.post(
-                    new Runnable() {
-                        @Override
-                        public void run() {
-                            if(scrollView.getScrollY() > 10) {
-                                //scrollView.fullScroll(ScrollView.FOCUS_UP);
-                            }
+                    () -> {
+                        if(scrollView.getScrollY() > 10) {
+                            //scrollView.fullScroll(ScrollView.FOCUS_UP);
                         }
                     }
             );
@@ -673,27 +624,34 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIntent();
+    }
+
+    @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if(isFromAndroidQClipboard) {
+        if(hasFocus && isFromAndroidQClipboard) {
             if (!Settings.getInstance(MyApplication.getContext()).getMoniteClipboardQ()) {
                 return;
             }
             ClipboardManager cb = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            if (cb.hasPrimaryClip()) {
-                if (cb.hasText()) {
-                    String text = cb.getText().toString();
-                    mTextToProcess = text;
+            if (cb != null && cb.hasPrimaryClip()) {
+                ClipData clipData = cb.getPrimaryClip();
+                if (clipData != null && clipData.getItemCount() > 0) {
+                    CharSequence text = clipData.getItemAt(0).coerceToText(this);
+                    if (text != null) {
+                        mTextToProcess = text.toString();
+                    }
                 }
             }
             populateWordSelectBox();
-            bigBangLayout.post( new Runnable() {
-                @Override
-                public void run() {
-                    setTargetWord();
-                    if(Utils.containsTranslationField(currentOutputPlan)){
-                        asyncTranslate(mTextToProcess);
-                    }
+            bigBangLayout.post(() -> {
+                setTargetWord();
+                if(Utils.containsTranslationField(currentOutputPlan)){
+                    asyncTranslate(mTextToProcess);
                 }
             });
         }
@@ -704,9 +662,6 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
         Intent intent = getIntent();
         String action = intent.getAction();
         String type = intent.getType();
-        if (intent == null) {
-            return;
-        }
         if (type == null) {
             return;
         }
@@ -756,13 +711,10 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
 
         HistoryUtil.savePopupOpen(mTextToProcess);
 
-        bigBangLayout.post( new Runnable() {
-            @Override
-            public void run() {
-                setTargetWord();
-                if(Utils.containsTranslationField(currentOutputPlan)){
-                    asyncTranslate(mTextToProcess);
-                }
+        bigBangLayout.post(() -> {
+            setTargetWord();
+            if(Utils.containsTranslationField(currentOutputPlan)){
+                asyncTranslate(mTextToProcess);
             }
         });
     }
@@ -774,15 +726,12 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
             bigBangLayout.addTextItem(localSegment);
         }
         bigBangLayout.post(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        String currentWord = FieldUtil.getSelectedText(bigBangLayout.getLines());
-                        if (!currentWord.equals("")&&!currentWord.equals(act.getText().toString())) {
-                            mCurrentKeyWord = currentWord;
-                            act.setText(currentWord);
-                            asyncSearch(currentWord);
-                        }
+                () -> {
+                    String currentWord = FieldUtil.getSelectedText(bigBangLayout.getLines());
+                    if (!currentWord.equals("")&&!currentWord.equals(act.getText().toString())) {
+                        mCurrentKeyWord = currentWord;
+                        act.setText(currentWord);
+                        asyncSearch(currentWord);
                     }
                 }
         );
@@ -790,7 +739,7 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
 
 
     private void asyncSearch(final String word) {
-        if (word.length() == 0) {
+        if (word.isEmpty()) {
             showPronounce(false);
             return;
         }
@@ -800,24 +749,21 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
         showProgressBar();
         progressBar.invalidate();
         showPronounce(true);
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    //Your code goes here
-                    Log.d("clicked", "yes");
-                    List<Definition> d = currentDictionary.wordLookup(word);
-                    Message message = mHandler.obtainMessage();
-                    message.obj = d;
-                    message.what = PROCESS_DEFINITION_LIST;
-                    mHandler.sendMessage(message);
-                } catch (Exception e) {
-                    String error = e.getMessage();
-                    Message message = mHandler.obtainMessage();
-                    message.obj = error;
-                    message.what = ASYNC_SEARCH_FAILED;
-                    mHandler.sendMessage(message);
-                }
+        Thread thread = new Thread(() -> {
+            try {
+                //Your code goes here
+                Log.d("clicked", "yes");
+                List<Definition> d = currentDictionary.wordLookup(word);
+                Message message = mHandler.obtainMessage();
+                message.obj = d;
+                message.what = PROCESS_DEFINITION_LIST;
+                mHandler.sendMessage(message);
+            } catch (Exception e) {
+                String error = e.getMessage();
+                Message message = mHandler.obtainMessage();
+                message.obj = error;
+                message.what = ASYNC_SEARCH_FAILED;
+                mHandler.sendMessage(message);
             }
         });
         thread.start();
@@ -829,28 +775,25 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
         if(mTextToProcess.trim().equals("")) return;
         showTranslateLoading();
         Thread thread = new Thread(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        try{
-                            String result;
-                            if(RegexUtil.isChineseSentence(mTextToProcess)){
-                                result = Translator.translate(mTextToProcess, "zh", "en");
-                            }else {
-                                result = Translator.translate(mTextToProcess, "auto", "zh");
-                            }
-                            Message message = mHandler.obtainMessage();
-                            message.obj = result;
-                            message.what = TRANSLATION_DONE;
-                            mHandler.sendMessage(message);
+                () -> {
+                    try{
+                        String result;
+                        if(RegexUtil.isChineseSentence(mTextToProcess)){
+                            result = Translator.translate(mTextToProcess, "zh", "en");
+                        }else {
+                            result = Translator.translate(mTextToProcess, "auto", "zh");
                         }
-                        catch(Exception e){
-                            String error = e.getMessage();
-                            Message message = mHandler.obtainMessage();
-                            message.obj = error;
-                            message.what = TRANSLATIOn_FAILED;
-                            mHandler.sendMessage(message);
-                        }
+                        Message message = mHandler.obtainMessage();
+                        message.obj = result;
+                        message.what = TRANSLATION_DONE;
+                        mHandler.sendMessage(message);
+                    }
+                    catch(Exception e){
+                        String error = e.getMessage();
+                        Message message = mHandler.obtainMessage();
+                        message.obj = error;
+                        message.what = TRANSLATIOn_FAILED;
+                        mHandler.sendMessage(message);
                     }
                 }
         );
@@ -869,15 +812,12 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
             }
         }
         act.setOnFocusChangeListener(
-                new View.OnFocusChangeListener() {
-                    @Override
-                    public void onFocusChange(View v, boolean hasFocus) {
-                        if(hasFocus){
-                            if(act.getText().toString().trim().isEmpty()){
-                                return;
-                            }
-                            act.showDropDown();
+                (v, hasFocus) -> {
+                    if(hasFocus){
+                        if(act.getText().toString().trim().isEmpty()){
+                            return;
                         }
+                        act.showDropDown();
                     }
                 }
         );
@@ -894,30 +834,13 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
             view = LayoutInflater.from(PopupActivity.this)
                     .inflate(R.layout.definition_item, null);
         }
-        //toggle fab with clicks
-//        view.setOnClickListener(
-//                new View.OnClickListener() {
-//                    @Override
-//                    public void onClick(View view) {
-//                        if(mFab.getVisibility() == View.VISIBLE){
-//                            mFab.hide();
-//                        }else{
-//                            mFab.show();
-//                        }
-//                    }
-//                }
-//        );
+
         final TextView textVeiwDefinition = (TextView) view.findViewById(R.id.textview_definition);
         final ImageButton btnAddDefinition = (ImageButton) view.findViewById(R.id.btn_add_definition);
         final LinearLayout btnAddDefinitionLarge = (LinearLayout) view.findViewById(R.id.btn_add_definition_large);
         final ImageView defImage = view.findViewById(R.id.def_img);
         btnAddDefinitionLarge.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        btnAddDefinition.callOnClick();
-                    }
-                }
+                v -> btnAddDefinition.callOnClick()
         );
         //final Definition def = mDefinitionList.get(position);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -942,417 +865,331 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
                 currentDictionary instanceof RenRenCiDianSentence) && def.getAudioUrl()!=null && !def.getAudioUrl().isEmpty()){
             textVeiwDefinition.setTextIsSelectable(false);
             textVeiwDefinition.setOnClickListener(
-                    new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            if (mMediaPlayer == null) {
-                                mMediaPlayer = new MediaPlayer();
-                                mMediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
-                                mMediaPlayer.setOnPreparedListener(
-                                        new MediaPlayer.OnPreparedListener() {
-                                            @Override
-                                            public void onPrepared(MediaPlayer mp) {
-                                                mMediaPlayer.start();
-                                                mAudioProgress.setVisibility(View.GONE);
-                                            }
-                                        }
-                                );
-                            }
-                            try {
-                                if(mMediaPlayer.isPlaying()) {
-                                    mMediaPlayer.reset();
-                                    //mMediaPlayer.release();
-                                }
-                            }catch(IllegalStateException e){
-
-                            }
-                            try {
-                                mMediaPlayer.setDataSource(PopupActivity.this, Uri.parse(def.getAudioUrl()));
-                                mAudioProgress.setVisibility(View.VISIBLE);
-                                mMediaPlayer.prepareAsync();
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                                Toast.makeText(PopupActivity.this, e.getMessage(), Toast.LENGTH_SHORT);
-                            } catch (IllegalStateException e){
-
-                            }
-//                            mMediaPlayer.setOnPreparedListener(
-//                                    new MediaPlayer.OnPreparedListener() {
-//                                        @Override
-//                                        public void onPrepared(MediaPlayer mp) {
-//                                        }
-//                                    }
-//                            );
-
-                            mMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                                @Override
-                                public void onCompletion(MediaPlayer mp) {
-                                    mp.reset();
-                                    mAudioProgress.setVisibility(View.GONE);
-                                }
-                            });
-
-                            mMediaPlayer.setOnErrorListener(
-                                    new MediaPlayer.OnErrorListener() {
+                    v -> {
+                        if (mMediaPlayer == null) {
+                            mMediaPlayer = new MediaPlayer();
+                            mMediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+                            mMediaPlayer.setOnPreparedListener(
+                                    new MediaPlayer.OnPreparedListener() {
                                         @Override
-                                        public boolean onError(MediaPlayer mp, int what, int extra) {
-                                            mp.reset();
-                                            Toast.makeText(PopupActivity.this, "Failed to play audio, check your connection.", Toast.LENGTH_SHORT);
+                                        public void onPrepared(MediaPlayer mp) {
+                                            mMediaPlayer.start();
                                             mAudioProgress.setVisibility(View.GONE);
-                                            return false;
                                         }
                                     }
                             );
-//                            if(mMediaPlayer == null){
-//                                mMediaPlayer = new MediaPlayer();
-//                            }
-//
-//                            try {
-//                                if(mMediaPlayer.isPlaying()) {
-//                                    mMediaPlayer.reset();
-//                                    //mMediaPlayer.release();
-//                                }
-//                            }catch(IllegalStateException e){
-//
-//                            }
-//                            try {
-//                                Toast.makeText(PopupActivity.this, "Loading...", Toast.LENGTH_SHORT).show();
-//                                mMediaPlayer.setDataSource(PopupActivity.this, Uri.parse(def.getAudioUrl()));
-//                                mMediaPlayer.prepare();
-//                                mMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-//                                    @Override
-//                                    public void onCompletion(MediaPlayer mp) {
-//                                        mMediaPlayer.reset();
-//                                        //mMediaPlayer.release();
-//                                    }
-//                                });
-//                                mMediaPlayer.start();
-//                            } catch (IOException e) {
-//                                e.printStackTrace();
-//                                Toast.makeText(PopupActivity.this, "Failed to play audio", Toast.LENGTH_SHORT).show();
-//                            }
                         }
+                        try {
+                            if(mMediaPlayer.isPlaying()) {
+                                mMediaPlayer.reset();
+                                //mMediaPlayer.release();
+                            }
+                        }catch(IllegalStateException e){
+
+                        }
+                        try {
+                            mMediaPlayer.setDataSource(PopupActivity.this, Uri.parse(def.getAudioUrl()));
+                            mAudioProgress.setVisibility(View.VISIBLE);
+                            mMediaPlayer.prepareAsync();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                            Toast.makeText(PopupActivity.this, e.getMessage(), Toast.LENGTH_SHORT);
+                        } catch (IllegalStateException e){
+
+                        }
+
+                        mMediaPlayer.setOnCompletionListener(mp -> {
+                            mp.reset();
+                            mAudioProgress.setVisibility(View.GONE);
+                        });
+
+                        mMediaPlayer.setOnErrorListener(
+                                (mp, what, extra) -> {
+                                    mp.reset();
+                                    Toast.makeText(PopupActivity.this, "Failed to play audio, check your connection.", Toast.LENGTH_SHORT);
+                                    mAudioProgress.setVisibility(View.GONE);
+                                    return false;
+                                }
+                        );
                     }
             );
         }
 
         //set custom action for the textView
         makeTextViewSelectAndSearch(textVeiwDefinition);
-        //holder.itemView.setAnimation(AnimationUtils.loadAnimation(mActivity, android.R.anim.fade_in));
-        //holder.textVeiwDefinition.setTextColor(Color.BLACK);
         btnAddDefinition.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        //vibarate(Constant.VIBRATE_DURATION);
-                        //before add, check if this note is already added by check the attached tag
-                        try {
-                            Long noteIdAdded = (Long) btnAddDefinition.getTag(R.id.TAG_NOTE_ID);
-                            if (noteIdAdded != null) {
-                                if (mUpdateNoteId == 0) {
-                                    if (Utils.deleteNote(PopupActivity.this, noteIdAdded.longValue())) {
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                                            btnAddDefinition.setBackground(ContextCompat.getDrawable(
-                                                    PopupActivity.this,
-                                                    Utils.getResIdFromAttribute(PopupActivity.this, R.attr.icon_add)));
-                                        }
-                                        btnAddDefinition.setTag(R.id.TAG_NOTE_ID, null);
-                                        Toast.makeText(PopupActivity.this, R.string.str_cancel_note_add, Toast.LENGTH_SHORT).show();
-
-                                    } else {
-                                        Toast.makeText(PopupActivity.this, R.string.error_note_cancel, Toast.LENGTH_SHORT).show();
+                v -> {
+                    //vibarate(Constant.VIBRATE_DURATION);
+                    //before add, check if this note is already added by check the attached tag
+                    try {
+                        Long noteIdAdded = (Long) btnAddDefinition.getTag(R.id.TAG_NOTE_ID);
+                        if (noteIdAdded != null) {
+                            if (mUpdateNoteId == 0) {
+                                if (Utils.deleteNote(PopupActivity.this, noteIdAdded.longValue())) {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                                        btnAddDefinition.setBackground(ContextCompat.getDrawable(
+                                                PopupActivity.this,
+                                                Utils.getResIdFromAttribute(PopupActivity.this, R.attr.icon_add)));
                                     }
+                                    btnAddDefinition.setTag(R.id.TAG_NOTE_ID, null);
+                                    Toast.makeText(PopupActivity.this, R.string.str_cancel_note_add, Toast.LENGTH_SHORT).show();
+
                                 } else {
-                                    Toast.makeText(PopupActivity.this, R.string.str_not_cancelable_append_mode, Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(PopupActivity.this, R.string.error_note_cancel, Toast.LENGTH_SHORT).show();
                                 }
+                            } else {
+                                Toast.makeText(PopupActivity.this, R.string.str_not_cancelable_append_mode, Toast.LENGTH_SHORT).show();
+                            }
+                            return;
+                        }
+
+                        //save image
+                        if (def.getImageUrl() != null && !def.getImageUrl().isEmpty()) {
+                            if (defImage.getDrawable() != null &&
+                                    (currentDictionary instanceof BingImage ||
+                                            currentDictionary instanceof RenRenCiDianSentence ||
+                                            currentDictionary instanceof Dub91Sentence)) {
+                                BitmapDrawable drawable = (BitmapDrawable) defImage.getDrawable();
+                                Bitmap bm = drawable.getBitmap();
+
+                                OutputStream fOut = null;
+                                //Uri outputFileUri;
+                                try {
+                                    File root = new File(Constant.IMAGE_MEDIA_DIRECTORY);
+                                    if (!root.exists()) {
+                                        root.mkdirs();
+                                    }
+                                    File sdImageMainDirectory = new File(root, def.getImageName());
+                                    //outputFileUri = Uri.fromFile(sdImageMainDirectory);
+                                    fOut = new FileOutputStream(sdImageMainDirectory);
+                                } catch (Exception e) {
+
+                                }
+                                try {
+                                    bm.compress(Bitmap.CompressFormat.PNG, 100, fOut);
+                                    fOut.flush();
+                                    fOut.close();
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        }
+                        ///////////////////////////////////
+
+                        AnkiDroidHelper mAnkiDroid = MyApplication.getAnkiDroid();
+                        String[] sharedExportElements = Constant.getSharedExportElements();
+                        String[] exportFields = new String[currentOutputPlan.getFieldsMap().size()];
+                        int i = 0;
+                        Map<String, String> map = currentOutputPlan.getFieldsMap();
+                        for (String exportedFieldKey : currentOutputPlan.getFieldsMap().values()) {
+                            if (exportedFieldKey.equals(sharedExportElements[0])) {
+                                exportFields[i] = "";
+                                i++;
+                                continue;
+                            }
+
+                            if (exportedFieldKey.equals(sharedExportElements[1])) {
+                                exportFields[i] = getNormalSentence(bigBangLayout.getLines());
+                                i++;
+                                continue;
+                            }
+
+                            if (exportedFieldKey.equals(sharedExportElements[2])) {
+                                exportFields[i] = getBoldSentence(bigBangLayout.getLines());
+                                i++;
+                                continue;
+                            }
+                            if (exportedFieldKey.equals(sharedExportElements[3])) {
+                                exportFields[i] = getBlankSentence(bigBangLayout.getLines(), true);
+                                i++;
+                                continue;
+                            }
+                            if (exportedFieldKey.equals(sharedExportElements[4])) {
+                                exportFields[i] = getBlankSentence(bigBangLayout.getLines(), false);
+                                i++;
+                                continue;
+                            }
+                            if (exportedFieldKey.equals(sharedExportElements[5])) {
+                                exportFields[i] = mNoteEditedByUser;
+                                i++;
+                                continue;
+                            }
+                            if (exportedFieldKey.equals(sharedExportElements[6])) {
+                                exportFields[i] = mUrl;
+                                i++;
+                                continue;
+                            }
+                            if (exportedFieldKey.equals(sharedExportElements[7])) {
+                                exportFields[i] = Utils.getAllHtmlFromDefinitionList(mDefinitionList);
+                                i++;
+                                continue;
+                            }
+                            if (exportedFieldKey.equals(sharedExportElements[8])) {
+                                exportFields[i] = mEditTextTranslation.getText().toString().replace("\n", "<br/>");
+                                i++;
+                                continue;
+                            }
+                            if (def.hasElement(exportedFieldKey)) {
+                                exportFields[i] = def.getExportElement(exportedFieldKey);
+                                i++;
+                                continue;
+                            }
+
+                            exportFields[i] = "";
+                            i++;
+                        }
+                        //handle download; audio or image
+                        if (currentDictionary instanceof EudicSentence ||
+                                currentDictionary instanceof RenRenCiDianSentence) {
+                            if (fetch == null) {
+                                initFetch();
+                            }
+                            if (map.containsValue("原声例句")) {
+                                final Request request = new Request(def.getAudioUrl(), Constant.AUDIO_MEDIA_DIRECTORY + def.getAudioName());
+                                request.setPriority(Priority.HIGH);
+                                request.setNetworkType(NetworkType.ALL);
+                                isFetchDownloading = true;
+                                fetch.enqueue(request,
+                                        result -> {
+                                            mAudioProgress.setVisibility(View.VISIBLE);
+                                        }
+                                        ,
+                                        result -> isFetchDownloading = false
+                                );
+                            }
+                        }
+
+                        if (currentDictionary instanceof SolrDictionary) {
+                            if (fetch == null) {
+                                initFetch();
+                            }
+                            if (!def.getAudioUrl().isEmpty() && (map.containsValue("音频") || map.containsValue("复合项"))) {
+                                final Request request = new Request(def.getAudioUrl(), Constant.AUDIO_MEDIA_DIRECTORY + def.getAudioName());
+                                request.setPriority(Priority.HIGH);
+                                request.setNetworkType(NetworkType.ALL);
+                                isFetchDownloading = true;
+                                fetch.enqueue(request,
+                                        result -> {
+                                            mAudioProgress.setVisibility(View.VISIBLE);
+                                            isFetchDownloading = true;
+                                        }
+                                        ,
+                                        result -> isFetchDownloading = false
+                                );
+                            }
+                        }
+
+                        if (currentDictionary instanceof VocabCom) {
+                            if (fetch == null) {
+                                initFetch();
+                            }
+                            if (map.containsValue("离线发音")) {
+                                final Request request = new Request(def.getAudioUrl(), Constant.AUDIO_MEDIA_DIRECTORY + def.getAudioName());
+                                request.setPriority(Priority.HIGH);
+                                request.setNetworkType(NetworkType.ALL);
+                                isFetchDownloading = true;
+                                fetch.enqueue(request,
+                                        result -> {
+                                            mAudioProgress.setVisibility(View.VISIBLE);
+                                            isFetchDownloading = true;
+                                        }
+                                        ,
+                                        result -> isFetchDownloading = false
+                                );
+                            }
+                        }
+                        /////////////////
+                        long deckId = currentOutputPlan.getOutputDeckId();
+                        long modelId = currentOutputPlan.getOutputModelId();
+                        if (mUpdateNoteId == 0) {
+                            Long result = mAnkiDroid.getApi().addNote(modelId, deckId, exportFields, mTagEditedByUser);
+                            if (result != null) {
+                                Toast.makeText(PopupActivity.this, R.string.str_added, Toast.LENGTH_SHORT).show();
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                                    btnAddDefinition.setBackground(ContextCompat.getDrawable(
+                                            PopupActivity.this, Utils.getResIdFromAttribute(PopupActivity.this, R.attr.icon_add_done)));
+                                }
+                                clearBigbangSelection();
+                                mNoteEditedByUser = "";
+                                //attach the noteid to the button
+                                btnAddDefinition.setTag(R.id.TAG_NOTE_ID, result);
+                                //if there is a note id field in the model, update the note
+                                int count = 0;
+                                for (String field : currentOutputPlan.getFieldsMap().keySet()) {
+                                    if (field.replace(" ", "").toLowerCase().equals("noteid")) {
+                                        exportFields[count] = result.toString();
+                                        boolean success = mAnkiDroid.getApi().updateNoteFields(
+                                                result.longValue(),
+                                                exportFields
+                                        );
+                                        if (!success) {
+                                            Toast.makeText(PopupActivity.this, R.string.str_error_noteid, Toast.LENGTH_SHORT).show();
+                                        }
+                                        break;
+                                    }
+                                    count++;
+                                }
+                                //save note add
+                                HistoryUtil.saveNoteAdd("", getBoldSentence(bigBangLayout.getLines()),
+                                        currentDictionary.getDictionaryName(),
+                                        textVeiwDefinition.getText().toString(),
+                                        mTranslatedResult,
+                                        mNoteEditedByUser,
+                                        mTagEditedByUser.toString()
+                                );
+                            } else {
+                                Toast.makeText(PopupActivity.this, R.string.str_failed_add, Toast.LENGTH_SHORT).show();
+                            }
+                        } else {//there's note id, so we need to retrieve note first
+                            NoteInfo note = mAnkiDroid.getApi().getNote(mUpdateNoteId);
+                            String[] original = note.getFields();
+                            Set<String> tags = note.getTags();
+                            if (original == null || original.length != exportFields.length) {
+                                Toast.makeText(PopupActivity.this, R.string.str_error_notetype_noncompatible, Toast.LENGTH_SHORT).show();
                                 return;
                             }
 
-                            //save image
-                            if (def.getImageUrl() != null && !def.getImageUrl().isEmpty()) {
-                                if (defImage.getDrawable() != null &&
-                                        (currentDictionary instanceof BingImage ||
-                                                currentDictionary instanceof RenRenCiDianSentence ||
-                                                currentDictionary instanceof Dub91Sentence)) {
-                                    BitmapDrawable drawable = (BitmapDrawable) defImage.getDrawable();
-                                    Bitmap bm = drawable.getBitmap();
-
-                                    OutputStream fOut = null;
-                                    //Uri outputFileUri;
-                                    try {
-                                        File root = new File(Constant.IMAGE_MEDIA_DIRECTORY);
-                                        if (!root.exists()) {
-                                            root.mkdirs();
-                                        }
-                                        File sdImageMainDirectory = new File(root, def.getImageName());
-                                        //outputFileUri = Uri.fromFile(sdImageMainDirectory);
-                                        fOut = new FileOutputStream(sdImageMainDirectory);
-                                    } catch (Exception e) {
-
+                            if (mUpdateAction != null && mUpdateAction.equals("replace")) {
+                                //replace
+                                for (int j = 0; j < original.length; j++) {
+                                    if (exportFields[j].isEmpty()) {
+                                        exportFields[j] = original[j];
                                     }
-                                    try {
-                                        bm.compress(Bitmap.CompressFormat.PNG, 100, fOut);
-                                        fOut.flush();
-                                        fOut.close();
-                                    } catch (Exception e) {
-                                        e.printStackTrace();
+                                }
+
+                            } else {
+                                //append
+                                for (int j = 0; j < original.length; j++) {
+                                    if (original[j].trim().isEmpty() || exportFields[j].trim().isEmpty()) {
+                                        exportFields[j] = original[j] + exportFields[j];
+                                    } else {
+                                        exportFields[j] = original[j] + "<br/>" + exportFields[j];
                                     }
                                 }
                             }
-                            ///////////////////////////////////
-
-                            AnkiDroidHelper mAnkiDroid = MyApplication.getAnkiDroid();
-                            String[] sharedExportElements = Constant.getSharedExportElements();
-                            String[] exportFields = new String[currentOutputPlan.getFieldsMap().size()];
-                            int i = 0;
-                            Map<String, String> map = currentOutputPlan.getFieldsMap();
-                            for (String exportedFieldKey : currentOutputPlan.getFieldsMap().values()) {
-                                if (exportedFieldKey.equals(sharedExportElements[0])) {
-                                    exportFields[i] = "";
-                                    i++;
-                                    continue;
-                                }
-
-                                if (exportedFieldKey.equals(sharedExportElements[1])) {
-                                    exportFields[i] = getNormalSentence(bigBangLayout.getLines());
-                                    i++;
-                                    continue;
-                                }
-
-                                if (exportedFieldKey.equals(sharedExportElements[2])) {
-                                    exportFields[i] = getBoldSentence(bigBangLayout.getLines());
-                                    i++;
-                                    continue;
-                                }
-                                if (exportedFieldKey.equals(sharedExportElements[3])) {
-                                    exportFields[i] = getBlankSentence(bigBangLayout.getLines(), true);
-                                    i++;
-                                    continue;
-                                }
-                                if (exportedFieldKey.equals(sharedExportElements[4])) {
-                                    exportFields[i] = getBlankSentence(bigBangLayout.getLines(), false);
-                                    i++;
-                                    continue;
-                                }
-                                if (exportedFieldKey.equals(sharedExportElements[5])) {
-                                    exportFields[i] = mNoteEditedByUser;
-                                    i++;
-                                    continue;
-                                }
-                                if (exportedFieldKey.equals(sharedExportElements[6])) {
-                                    exportFields[i] = mUrl;
-                                    i++;
-                                    continue;
-                                }
-                                if (exportedFieldKey.equals(sharedExportElements[7])) {
-                                    exportFields[i] = Utils.getAllHtmlFromDefinitionList(mDefinitionList);
-                                    i++;
-                                    continue;
-                                }
-                                if (exportedFieldKey.equals(sharedExportElements[8])) {
-                                    exportFields[i] = mEditTextTranslation.getText().toString().replace("\n", "<br/>");
-                                    i++;
-                                    continue;
-                                }
-//                            if(exportedFieldKey.equals(sharedExportElements[5])){
-//                                if(mFbReaderBookmarkId != null){
-//                                    exportFields[i] = String.format(Constant.FBREADER_URL_TMPL, mFbReaderBookmarkId);
-//                                }else{
-//                                    exportFields[i]="";
-//                                }
-//                                i++;
-//                                continue;
-//                            }
-                                if (def.hasElement(exportedFieldKey)) {
-                                    exportFields[i] = def.getExportElement(exportedFieldKey);
-                                    i++;
-                                    continue;
-                                }
-
-                                exportFields[i] = "";
-                                i++;
+                            //we need to check the tag used by user is already in the tags, if not, add it
+                            tags.addAll(mTagEditedByUser);
+                            boolean success = mAnkiDroid.getApi().updateNoteFields(mUpdateNoteId, exportFields);
+                            boolean successTag = mAnkiDroid.getApi().updateNoteTags(mUpdateNoteId, tags);
+                            if (success && successTag) {
+                                Toast.makeText(PopupActivity.this, R.string.str_note_updated, Toast.LENGTH_SHORT).show();
+                                btnAddDefinition.setBackground(ContextCompat.getDrawable(
+                                        PopupActivity.this, Utils.getResIdFromAttribute(PopupActivity.this, R.attr.icon_add_done)));
+                            } else {
+                                Toast.makeText(PopupActivity.this, R.string.str_error_note_update, Toast.LENGTH_SHORT).show();
                             }
-                            //handle download; audio or image
-                            if (currentDictionary instanceof EudicSentence ||
-                                    currentDictionary instanceof RenRenCiDianSentence) {
-                                if (fetch == null) {
-                                    initFetch();
-                                }
-                                if (map.containsValue("原声例句")) {
-                                    final Request request = new Request(def.getAudioUrl(), Constant.AUDIO_MEDIA_DIRECTORY + def.getAudioName());
-                                    request.setPriority(Priority.HIGH);
-                                    request.setNetworkType(NetworkType.ALL);
-                                    isFetchDownloading = true;
-                                    fetch.enqueue(request,
-                                            new Func<Request>() {
-                                                @Override
-                                                public void call(@NotNull Request result) {
-                                                    mAudioProgress.setVisibility(View.VISIBLE);
-                                                    //                                isFetchDownloading = true;
-                                                }
-                                            }
-                                            ,
-                                            new Func<Error>() {
-                                                @Override
-                                                public void call(@NotNull Error result) {
-                                                    isFetchDownloading = false;
-                                                }
-                                            }
-                                    );
-                                }
-                            }
-
-                            if (currentDictionary instanceof SolrDictionary) {
-                                if (fetch == null) {
-                                    initFetch();
-                                }
-                                if (!def.getAudioUrl().isEmpty() && (map.containsValue("音频") || map.containsValue("复合项"))) {
-                                    final Request request = new Request(def.getAudioUrl(), Constant.AUDIO_MEDIA_DIRECTORY + def.getAudioName());
-                                    request.setPriority(Priority.HIGH);
-                                    request.setNetworkType(NetworkType.ALL);
-                                    isFetchDownloading = true;
-                                    fetch.enqueue(request,
-                                            new Func<Request>() {
-                                                @Override
-                                                public void call(@NotNull Request result) {
-                                                    mAudioProgress.setVisibility(View.VISIBLE);
-                                                    isFetchDownloading = true;
-                                                }
-                                            }
-                                            ,
-                                            new Func<Error>() {
-                                                @Override
-                                                public void call(@NotNull Error result) {
-                                                    isFetchDownloading = false;
-                                                }
-                                            }
-                                    );
-                                }
-                            }
-
-                            if (currentDictionary instanceof VocabCom) {
-                                if (fetch == null) {
-                                    initFetch();
-                                }
-                                if (map.containsValue("离线发音")) {
-                                    final Request request = new Request(def.getAudioUrl(), Constant.AUDIO_MEDIA_DIRECTORY + def.getAudioName());
-                                    request.setPriority(Priority.HIGH);
-                                    request.setNetworkType(NetworkType.ALL);
-                                    isFetchDownloading = true;
-                                    fetch.enqueue(request,
-                                            new Func<Request>() {
-                                                @Override
-                                                public void call(@NotNull Request result) {
-                                                    mAudioProgress.setVisibility(View.VISIBLE);
-                                                    isFetchDownloading = true;
-                                                }
-                                            }
-                                            ,
-                                            new Func<Error>() {
-                                                @Override
-                                                public void call(@NotNull Error result) {
-                                                    isFetchDownloading = false;
-                                                }
-                                            }
-                                    );
-                                }
-                            }
-                            /////////////////
-                            long deckId = currentOutputPlan.getOutputDeckId();
-                            long modelId = currentOutputPlan.getOutputModelId();
-                            if (mUpdateNoteId == 0) {
-                                Long result = mAnkiDroid.getApi().addNote(modelId, deckId, exportFields, mTagEditedByUser);
-                                if (result != null) {
-                                    Toast.makeText(PopupActivity.this, R.string.str_added, Toast.LENGTH_SHORT).show();
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                                        btnAddDefinition.setBackground(ContextCompat.getDrawable(
-                                                PopupActivity.this, Utils.getResIdFromAttribute(PopupActivity.this, R.attr.icon_add_done)));
-                                    }
-                                    clearBigbangSelection();
-                                    mNoteEditedByUser = "";
-                                    //attach the noteid to the button
-                                    btnAddDefinition.setTag(R.id.TAG_NOTE_ID, result);
-                                    //if there is a note id field in the model, update the note
-                                    int count = 0;
-                                    for (String field : currentOutputPlan.getFieldsMap().keySet()) {
-                                        if (field.replace(" ", "").toLowerCase().equals("noteid")) {
-                                            exportFields[count] = result.toString();
-                                            boolean success = mAnkiDroid.getApi().updateNoteFields(
-                                                    result.longValue(),
-                                                    exportFields
-                                            );
-                                            if (!success) {
-                                                Toast.makeText(PopupActivity.this, R.string.str_error_noteid, Toast.LENGTH_SHORT).show();
-                                            }
-                                            break;
-                                        }
-                                        count++;
-                                    }
-                                    //save note add
-                                    HistoryUtil.saveNoteAdd("", getBoldSentence(bigBangLayout.getLines()),
-                                            currentDictionary.getDictionaryName(),
-                                            textVeiwDefinition.getText().toString(),
-                                            mTranslatedResult,
-                                            mNoteEditedByUser,
-                                            mTagEditedByUser.toString()
-                                    );
-                                } else {
-                                    Toast.makeText(PopupActivity.this, R.string.str_failed_add, Toast.LENGTH_SHORT).show();
-                                }
-                            } else {//there's note id, so we need to retrieve note first
-                                NoteInfo note = mAnkiDroid.getApi().getNote(mUpdateNoteId);
-                                String[] original = note.getFields();
-                                Set<String> tags = note.getTags();
-                                if (original == null || original.length != exportFields.length) {
-                                    Toast.makeText(PopupActivity.this, R.string.str_error_notetype_noncompatible, Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
-
-                                if (mUpdateAction != null && mUpdateAction.equals("replace")) {
-                                    //replace
-                                    for (int j = 0; j < original.length; j++) {
-                                        if (exportFields[j].isEmpty()) {
-                                            exportFields[j] = original[j];
-                                        }
-                                    }
-
-                                } else {
-                                    //append
-                                    for (int j = 0; j < original.length; j++) {
-                                        if (original[j].trim().isEmpty() || exportFields[j].trim().isEmpty()) {
-                                            exportFields[j] = original[j] + exportFields[j];
-                                        } else {
-                                            exportFields[j] = original[j] + "<br/>" + exportFields[j];
-                                        }
-                                    }
-                                }
-                                //we need to check the tag used by user is already in the tags, if not, add it
-                                tags.addAll(mTagEditedByUser);
-                                boolean success = mAnkiDroid.getApi().updateNoteFields(mUpdateNoteId, exportFields);
-                                boolean successTag = mAnkiDroid.getApi().updateNoteTags(mUpdateNoteId, tags);
-                                if (success && successTag) {
-                                    Toast.makeText(PopupActivity.this, R.string.str_note_updated, Toast.LENGTH_SHORT).show();
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                                        btnAddDefinition.setBackground(ContextCompat.getDrawable(
-                                                PopupActivity.this, Utils.getResIdFromAttribute(PopupActivity.this, R.attr.icon_add_done)));
-                                    }
-                                    //btnAddDefinition.setEnabled(false);
-                                } else {
-                                    Toast.makeText(PopupActivity.this, R.string.str_error_note_update, Toast.LENGTH_SHORT).show();
-                                }
-                            }
-                            if (settings.getAutoCancelPopupQ()) {
-                                if (fetch == null) {
-                                    finish();
-                                } else {
-                                    if (!isFetchDownloading) {
-                                        finish();
-                                    }
-                                }
-                            }
-                        }catch (Exception e){
-                            Toast.makeText(PopupActivity.this, e.getLocalizedMessage(), Toast.LENGTH_SHORT).show();
                         }
+                        if (settings.getAutoCancelPopupQ()) {
+                            if (fetch == null) {
+                                finish();
+                            } else {
+                                if (!isFetchDownloading) {
+                                    finish();
+                                }
+                            }
+                        }
+                    }catch (Exception e){
+                        Toast.makeText(PopupActivity.this, e.getLocalizedMessage(), Toast.LENGTH_SHORT).show();
                     }
                 });
         return view;
@@ -1364,23 +1201,14 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
         final View dialogView = inflater.inflate(R.layout.dialog_edit_note, null);
         dialogBuilder.setView(dialogView);
 
-        final EditText edt = (EditText) dialogView.findViewById(R.id.edit_note);
+        final EditText edt = dialogView.findViewById(R.id.edit_note);
         edt.setHorizontallyScrolling(false);
         edt.setMaxLines(4);
         edt.setText(mNoteEditedByUser);
         edt.setSelection(mNoteEditedByUser.length());
         dialogBuilder.setTitle(R.string.dialog_note);
         //dialogBuilder.setMessage("输入笔记");
-        dialogBuilder.setPositiveButton(R.string.dialog_ok, new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int whichButton) {
-                mNoteEditedByUser = edt.getText().toString();
-            }
-        });
-//                        dialogBuilder.setNegativeButton("取消", new DialogInterface.OnClickListener() {
-//                            public void onClick(DialogInterface dialog, int whichButton) {
-//                                //pass
-//                            }
-//                        });
+        dialogBuilder.setPositiveButton(R.string.dialog_ok, (dialog, whichButton) -> mNoteEditedByUser = edt.getText().toString());
         AlertDialog b = dialogBuilder.create();
         b.show();
     }
@@ -1390,7 +1218,7 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
         LayoutInflater inflater = PopupActivity.this.getLayoutInflater();
         final View dialogView = inflater.inflate(R.layout.dialog_edit_tag, null);
         dialogBuilder.setView(dialogView);
-        final AutoCompleteTextView editTag = (AutoCompleteTextView) dialogView.findViewById(R.id.edit_tag);
+        final AutoCompleteTextView editTag = dialogView.findViewById(R.id.edit_tag);
         final CheckBox checkBoxSetAsDefaultTag = (CheckBox) dialogView.findViewById(R.id.checkbox_as_default_tag);
         final ChipGroup tagChipGroup = (ChipGroup) dialogView.findViewById(R.id.tag_chip_list);
         editTag.setImeOptions(EditorInfo.IME_ACTION_DONE);
@@ -1405,19 +1233,16 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
             final Chip chip = (Chip) inflater.inflate(R.layout.tag_chip_item, null);
             chip.setText(userTag.getTag());
             chip.setOnCheckedChangeListener(
-                    new CompoundButton.OnCheckedChangeListener() {
-                        @Override
-                        public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                            if(isChecked){
-                                mTagEditedByUser.add(chip.getText().toString());
-                            }else{
-                                mTagEditedByUser.remove(chip.getText().toString());
-                            }
-                            //tag1,tag2,tag3
-                            String text = Utils.fromTagSetToString(mTagEditedByUser);
-                            editTag.setText(text);
-                            editTag.setSelection(text.length());
+                    (buttonView, isChecked) -> {
+                        if(isChecked){
+                            mTagEditedByUser.add(chip.getText().toString());
+                        }else{
+                            mTagEditedByUser.remove(chip.getText().toString());
                         }
+                        //tag1,tag2,tag3
+                        String text = Utils.fromTagSetToString(mTagEditedByUser);
+                        editTag.setText(text);
+                        editTag.setSelection(text.length());
                     }
             );
             if(mTagEditedByUser.contains(chip.getText().toString())){
@@ -1425,22 +1250,6 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
             }
             tagChipGroup.addView(chip);
         }
-//        String[] arr = new String[userTags.size()];
-//        for (int i = 0; i < userTags.size(); i++) {
-//            arr[i] = userTags.get(i).getTag();
-//        }
-//        ArrayAdapter<String> arrayAdapter = new ArrayAdapter<String>(PopupActivity.this,
-//                R.layout.support_simple_spinner_dropdown_item, arr);
-//        editTag.setAdapter(arrayAdapter);
-//        editTag.setOnTouchListener(new View.OnTouchListener() {
-//            @Override
-//            public boolean onTouch(View v, MotionEvent event) {
-//                if (editTag.getText().toString().isEmpty()) {
-//                    editTag.showDropDown();
-//                }
-//                return false;
-//            }
-//        });
         boolean setDefaultQ = settings.getSetAsDefaultTag();
         checkBoxSetAsDefaultTag.setChecked(setDefaultQ);
         dialogBuilder.setTitle(R.string.dialog_tag);
@@ -1597,7 +1406,7 @@ public class PopupActivity extends Activity implements BigBangLayoutWrapper.Acti
 
     private void startCBService() {
         Intent intent = new Intent(this, CBWatcherService.class);
-        startService(intent);
+        ContextCompat.startForegroundService(this, intent);
     }
 
     private void showProgressBar() {

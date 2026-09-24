@@ -7,31 +7,29 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
-import androidx.annotation.NonNull;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
-import android.text.Html;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.CompoundButton;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
+import com.mmjang.ankihelper.MyApplication;
 import com.mmjang.ankihelper.R;
 import com.mmjang.ankihelper.anki.AnkiDroidHelper;
+import com.mmjang.ankihelper.data.Settings;
 import com.mmjang.ankihelper.data.database.ExternalDatabase;
 import com.mmjang.ankihelper.data.database.MigrationUtil;
 import com.mmjang.ankihelper.data.plan.DefaultPlan;
 import com.mmjang.ankihelper.data.plan.OutputPlanPOJO;
 import com.mmjang.ankihelper.domain.CBWatcherService;
-import com.mmjang.ankihelper.MyApplication;
-import com.mmjang.ankihelper.data.Settings;
 import com.mmjang.ankihelper.ui.content.ContentActivity;
 import com.mmjang.ankihelper.ui.customdict.CustomDictionaryActivity;
 import com.mmjang.ankihelper.ui.plan.PlansManagerActivity;
@@ -63,8 +61,8 @@ public class LauncherActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        if (settings.getPinkThemeQ()) {
         settings = Settings.getInstance(this);
+        if (settings.getPinkThemeQ()) {
             setTheme(R.style.AppThemePink);
         }
         super.onCreate(savedInstanceState);
@@ -84,6 +82,10 @@ public class LauncherActivity extends AppCompatActivity {
         switchMoniteClipboard.setChecked(
                 settings.getMoniteClipboardQ()
         );
+
+        if (settings.getMoniteClipboardQ()) {
+            startCBService();
+        }
 
         switchCancelAfterAdd.setChecked(
                 settings.getAutoCancelPopupQ()
@@ -193,12 +195,9 @@ public class LauncherActivity extends AppCompatActivity {
         }
 
         textViewRandomQuote.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        Intent intent = new Intent(LauncherActivity.this, ContentActivity.class);
-                        startActivity(intent);
-                    }
+                view -> {
+                    Intent intent = new Intent(LauncherActivity.this, ContentActivity.class);
+                    startActivity(intent);
                 }
         );
     }
@@ -230,14 +229,9 @@ public class LauncherActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-//                case R.id.menu_item_book_shelf:
-//                    Intent intent = new Intent(this, BookshelfActivity.class);
-//                    startActivity(intent);
-//                    break;
-            case R.id.menu_item_stat:
-                Intent intent2 = new Intent(this, StatActivity.class);
-                startActivity(intent2);
+        if (item.getItemId() == R.id.menu_item_stat) {
+            Intent intent2 = new Intent(this, StatActivity.class);
+            startActivity(intent2);
         }
         return true;
     }
@@ -296,7 +290,7 @@ public class LauncherActivity extends AppCompatActivity {
 
     private void startCBService() {
         Intent intent = new Intent(this, CBWatcherService.class);
-        startService(intent);
+        ContextCompat.startForegroundService(this, intent);
     }
 
     private void stopCBService() {
@@ -311,10 +305,8 @@ public class LauncherActivity extends AppCompatActivity {
                 new AlertDialog.Builder(LauncherActivity.this)
                         .setMessage(R.string.duplicate_plan_name_complain)
                         .setIcon(android.R.drawable.ic_dialog_alert)
-                        .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int whichButton) {
-                                return;
-                            }
+                        .setPositiveButton(android.R.string.yes, (dialog, whichButton) -> {
+                            return;
                         }).show();
                 return;
             }
@@ -323,29 +315,25 @@ public class LauncherActivity extends AppCompatActivity {
             new AlertDialog.Builder(LauncherActivity.this)
                     .setTitle(R.string.confirm_add_default_plan)
                     .setIcon(android.R.drawable.ic_dialog_alert)
-                    .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int whichButton) {
-                            DefaultPlan plan = new DefaultPlan(LauncherActivity.this);
-                            plan.addDefaultPlan();
-                            Toast.makeText(LauncherActivity.this, R.string.default_plan_added, Toast.LENGTH_SHORT).show();
-                        }
+                    .setPositiveButton(android.R.string.yes, (dialog, whichButton) -> {
+                        DefaultPlan plan = new DefaultPlan(LauncherActivity.this);
+                        plan.addDefaultPlan();
+                        Toast.makeText(LauncherActivity.this, R.string.default_plan_added, Toast.LENGTH_SHORT).show();
                     })
                     .setNegativeButton(android.R.string.no, null).show();
         } else {
             new AlertDialog.Builder(LauncherActivity.this)
                     .setMessage(R.string.confirm_add_default_plan_when_exists_already)
                     .setIcon(android.R.drawable.ic_dialog_alert)
-                    .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int whichButton) {
-                            try {
-                                DefaultPlan plan = new DefaultPlan(LauncherActivity.this);
-                                plan.addDefaultPlan();
-                                Toast.makeText(LauncherActivity.this, 
-                                        R.string.default_plan_added, Toast.LENGTH_SHORT).show();
-                            }catch (Exception e){
-                                Toast.makeText(LauncherActivity.this, 
-                                        e.getLocalizedMessage(), Toast.LENGTH_SHORT).show();
-                            }
+                    .setPositiveButton(android.R.string.yes, (dialog, whichButton) -> {
+                        try {
+                            DefaultPlan plan = new DefaultPlan(LauncherActivity.this);
+                            plan.addDefaultPlan();
+                            Toast.makeText(LauncherActivity.this,
+                                    R.string.default_plan_added, Toast.LENGTH_SHORT).show();
+                        } catch (Exception e) {
+                            Toast.makeText(LauncherActivity.this,
+                                    e.getLocalizedMessage(), Toast.LENGTH_SHORT).show();
                         }
                     })
                     .setNegativeButton(android.R.string.no, null).show();
@@ -366,7 +354,6 @@ public class LauncherActivity extends AppCompatActivity {
     }
 
 
-
     public void setVersion() {
         try {
             String versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
@@ -380,7 +367,15 @@ public class LauncherActivity extends AppCompatActivity {
     }
 
     private void initStoragePermission() {
-        if (Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT < 33) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(LauncherActivity.this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(LauncherActivity.this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        2);
+            }
+            ensureExternalDbDirectoryAndMigrate();
+        } else if (Build.VERSION.SDK_INT >= 23) {
             int result = ContextCompat.checkSelfPermission(LauncherActivity.this,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE);
             if (result != PackageManager.PERMISSION_GRANTED) {
