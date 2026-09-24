@@ -341,14 +341,16 @@ public class LauncherActivity extends AppCompatActivity {
     }
 
     private void ensureExternalDbDirectoryAndMigrate() {
-        File f = new File(Environment.getExternalStorageDirectory(), Constant.EXTERNAL_STORAGE_DIRECTORY);
-        if (!f.exists()) {
-            f.mkdirs();
-        }
-        //the content folder
-        File f2 = new File(f, Constant.EXTERNAL_STORAGE_CONTENT_SUBDIRECTORY);
-        if (!f2.exists()) {
-            f2.mkdir();
+        File extFilesDir = getExternalFilesDir(null);
+        if (extFilesDir != null) {
+            File f = new File(extFilesDir, Constant.EXTERNAL_STORAGE_DIRECTORY);
+            if (!f.exists()) {
+                f.mkdirs();
+            }
+            File f2 = new File(f, Constant.EXTERNAL_STORAGE_CONTENT_SUBDIRECTORY);
+            if (!f2.exists()) {
+                f2.mkdirs();
+            }
         }
 
         if (!settings.getOldDataMigrated() && MigrationUtil.needMigration()) {
