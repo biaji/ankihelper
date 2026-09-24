@@ -83,7 +83,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".ui.about.AboutActivity" />
         <activity
             android:name=".ui.customdict.CustomDictionaryActivity"
             android:label="@string/btn_open_custom_dicitonary_str"

@@ -1,7 +1,5 @@
 package com.mmjang.ankihelper.domain;
 
-
-
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
